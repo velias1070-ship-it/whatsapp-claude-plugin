@@ -881,7 +881,8 @@ async function connectWhatsApp(): Promise<void> {
     auth: state,
     printQRInTerminal: !PHONE_NUMBER, // QR only if no phone number set
     logger: silentLogger,
-    browser: ['Claude Code', 'Chrome', '22.0'],
+    browser: ['Mac OS', 'Chrome', '14.4.1'],
+    defaultQueryTimeoutMs: undefined,
     generateHighQualityLinkPreview: false,
     syncFullHistory: false,
     markOnlineOnConnect: false,
