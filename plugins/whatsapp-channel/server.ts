@@ -869,12 +869,26 @@ async function connectWhatsApp(): Promise<void> {
       pairingCodeRequested = true
       try {
         const code = await localSock.requestPairingCode(PHONE_NUMBER)
-        process.stderr.write(
-          `whatsapp channel: pairing code: ${code}\n` +
-          `  Open WhatsApp > Linked Devices > Link a Device\n` +
-          `  Tap "Link with phone number instead"\n` +
-          `  Enter the code above\n`,
-        )
+        const pairingMsg =
+          `Pairing code: ${code}\n` +
+          `Open WhatsApp > Linked Devices > Link a Device\n` +
+          `Tap "Link with phone number instead"\n` +
+          `Enter the code above`
+        process.stderr.write(`whatsapp channel: ${pairingMsg}\n`)
+        // Surface pairing code to Claude session via MCP notification
+        mcp.notification({
+          method: 'notifications/claude/channel',
+          params: {
+            content: pairingMsg,
+            meta: {
+              chat_id: 'system',
+              message_id: `pairing-${Date.now()}`,
+              user: 'WhatsApp Setup',
+              user_id: 'system',
+              ts: new Date().toISOString(),
+            },
+          },
+        }).catch(() => {})
       } catch (err) {
         // Will retry on next connectWhatsApp call
         pairingCodeRequested = false
@@ -898,12 +912,25 @@ async function connectWhatsApp(): Promise<void> {
       pairingCodeRequested = true
       try {
         const code = await sock!.requestPairingCode(PHONE_NUMBER)
-        process.stderr.write(
-          `whatsapp channel: pairing code (alternative): ${code}\n` +
-          `  Open WhatsApp > Linked Devices > Link a Device\n` +
-          `  Tap "Link with phone number instead"\n` +
-          `  Enter the code above\n`,
-        )
+        const pairingMsg =
+          `Pairing code: ${code}\n` +
+          `Open WhatsApp > Linked Devices > Link a Device\n` +
+          `Tap "Link with phone number instead"\n` +
+          `Enter the code above`
+        process.stderr.write(`whatsapp channel: ${pairingMsg}\n`)
+        mcp.notification({
+          method: 'notifications/claude/channel',
+          params: {
+            content: pairingMsg,
+            meta: {
+              chat_id: 'system',
+              message_id: `pairing-${Date.now()}`,
+              user: 'WhatsApp Setup',
+              user_id: 'system',
+              ts: new Date().toISOString(),
+            },
+          },
+        }).catch(() => {})
       } catch (err) {
         process.stderr.write(`whatsapp channel: pairing code request failed: ${err}\n`)
       }
@@ -914,6 +941,19 @@ async function connectWhatsApp(): Promise<void> {
       pairingCodeRequested = false
       ownJid = jidNormalizedUser(sock!.user?.id ?? '')
       process.stderr.write(`whatsapp channel: connected as ${ownJid}\n`)
+      mcp.notification({
+        method: 'notifications/claude/channel',
+        params: {
+          content: `WhatsApp connected successfully as ${ownJid}. Ready to receive messages.`,
+          meta: {
+            chat_id: 'system',
+            message_id: `connected-${Date.now()}`,
+            user: 'WhatsApp Setup',
+            user_id: 'system',
+            ts: new Date().toISOString(),
+          },
+        },
+      }).catch(() => {})
     }
 
     if (connection === 'close') {
