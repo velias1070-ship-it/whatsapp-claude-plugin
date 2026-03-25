@@ -5,8 +5,12 @@ user-invocable: true
 allowed-tools:
   - Read
   - Write
+  - Edit
   - Bash(ls *)
   - Bash(mkdir *)
+  - Read(~/.claude/channels/whatsapp/*)
+  - Write(~/.claude/channels/whatsapp/*)
+  - Edit(~/.claude/channels/whatsapp/*)
 ---
 
 # /whatsapp:access — WhatsApp Channel Access Management
@@ -127,8 +131,8 @@ Read, set the key, write, confirm.
 - Pretty-print the JSON (2-space indent) so it's hand-editable.
 - The channels dir might not exist if the server hasn't run yet — handle
   ENOENT gracefully and create defaults.
-- Sender IDs are WhatsApp JIDs (e.g. `15551234567@s.whatsapp.net` for DMs,
-  `123456789012345678@g.us` for groups). Don't validate format beyond
+- Sender IDs are WhatsApp JIDs (e.g. `886912345678@s.whatsapp.net` for DMs,
+  `120363424405607157@g.us` for groups). Don't validate format beyond
   checking for a `@` sign.
 - Pairing always requires the code. If the user says "approve the pairing"
   without one, list the pending entries and ask which code. Don't auto-pick

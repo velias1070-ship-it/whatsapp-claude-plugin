@@ -5,9 +5,14 @@ user-invocable: true
 allowed-tools:
   - Read
   - Write
+  - Edit
   - Bash(ls *)
   - Bash(mkdir *)
   - Bash(rm -rf *)
+  - Bash(chmod *)
+  - Read(~/.claude/channels/whatsapp/*)
+  - Write(~/.claude/channels/whatsapp/*)
+  - Edit(~/.claude/channels/whatsapp/*)
 ---
 
 # /whatsapp:configure — WhatsApp Channel Setup
@@ -39,7 +44,7 @@ Read both state files and give the user a complete picture:
 
 4. **What next** — end with a concrete next step based on state:
    - No phone number → *"Run `/whatsapp:configure <phone>` with your
-     WhatsApp phone number (e.g. `15551234567`, no leading +)."*
+     WhatsApp phone number (e.g. `886912345678`, no leading +)."*
    - Phone set but not paired → *"Launch with `claude --channels
      plugin:whatsapp@claude-code-plugins`. The server will request a
      pairing code — enter it on your phone under Linked Devices > Link
