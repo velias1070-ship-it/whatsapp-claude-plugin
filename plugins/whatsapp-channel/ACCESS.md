@@ -11,8 +11,8 @@ All state lives in `~/.claude/channels/whatsapp/access.json`. The `/whatsapp:acc
 | | |
 | --- | --- |
 | Default policy | `pairing` |
-| Sender ID | WhatsApp JID (e.g. `15551234567@s.whatsapp.net`) |
-| Group key | Group JID (e.g. `123456789012345678@g.us`) |
+| Sender ID | WhatsApp JID (e.g. `886912345678@s.whatsapp.net`) |
+| Group key | Group JID (e.g. `120363424405607157@g.us`) |
 | `ackReaction` quirk | Any emoji — WhatsApp has no fixed whitelist |
 | Config file | `~/.claude/channels/whatsapp/access.json` |
 
@@ -32,13 +32,13 @@ All state lives in `~/.claude/channels/whatsapp/access.json`. The `/whatsapp:acc
 
 ## User IDs (JIDs)
 
-WhatsApp identifies users by **JIDs** — phone number + `@s.whatsapp.net`, e.g. `15551234567@s.whatsapp.net`. The allowlist stores JIDs.
+WhatsApp identifies users by **JIDs** — phone number + `@s.whatsapp.net`, e.g. `886912345678@s.whatsapp.net`. The allowlist stores JIDs.
 
 Pairing captures the JID automatically. To add one manually, use the phone number with country code, no leading `+`, followed by `@s.whatsapp.net`.
 
 ```
-/whatsapp:access allow 15551234567@s.whatsapp.net
-/whatsapp:access remove 15551234567@s.whatsapp.net
+/whatsapp:access allow 886912345678@s.whatsapp.net
+/whatsapp:access remove 886912345678@s.whatsapp.net
 ```
 
 ## Groups
@@ -46,7 +46,7 @@ Pairing captures the JID automatically. To add one manually, use the phone numbe
 Groups are off by default. Opt each one in individually.
 
 ```
-/whatsapp:access group add 123456789012345678@g.us
+/whatsapp:access group add 120363424405607157@g.us
 ```
 
 Group JIDs end in `@g.us`. To find one, add the linked device to the group — the server logs the group JID when it receives a message from an unenabled group.
@@ -54,9 +54,9 @@ Group JIDs end in `@g.us`. To find one, add the linked device to the group — t
 With the default `requireMention: true`, the server responds only when @mentioned. Pass `--no-mention` to process every message, or `--allow jid1,jid2` to restrict which members can trigger it.
 
 ```
-/whatsapp:access group add 123456789012345678@g.us --no-mention
-/whatsapp:access group add 123456789012345678@g.us --allow 15551234567@s.whatsapp.net,15557654321@s.whatsapp.net
-/whatsapp:access group rm 123456789012345678@g.us
+/whatsapp:access group add 120363424405607157@g.us --no-mention
+/whatsapp:access group add 120363424405607157@g.us --allow 886912345678@s.whatsapp.net,886987654321@s.whatsapp.net
+/whatsapp:access group rm 120363424405607157@g.us
 ```
 
 ## Mention detection
@@ -94,11 +94,11 @@ Configure outbound behavior with `/whatsapp:access set <key> <value>`.
 | `/whatsapp:access` | Print current state: policy, allowlist, pending pairings, enabled groups. |
 | `/whatsapp:access pair a4f91c` | Approve pairing code `a4f91c`. Adds the sender to `allowFrom` and sends a confirmation on WhatsApp. |
 | `/whatsapp:access deny a4f91c` | Discard a pending code. The sender is not notified. |
-| `/whatsapp:access allow 15551234567@s.whatsapp.net` | Add a JID directly. |
-| `/whatsapp:access remove 15551234567@s.whatsapp.net` | Remove from the allowlist. |
+| `/whatsapp:access allow 886912345678@s.whatsapp.net` | Add a JID directly. |
+| `/whatsapp:access remove 886912345678@s.whatsapp.net` | Remove from the allowlist. |
 | `/whatsapp:access policy allowlist` | Set `dmPolicy`. Values: `pairing`, `allowlist`, `disabled`. |
-| `/whatsapp:access group add 123456789012345678@g.us` | Enable a group. Flags: `--no-mention`, `--allow jid1,jid2`. |
-| `/whatsapp:access group rm 123456789012345678@g.us` | Disable a group. |
+| `/whatsapp:access group add 120363424405607157@g.us` | Enable a group. Flags: `--no-mention`, `--allow jid1,jid2`. |
+| `/whatsapp:access group rm 120363424405607157@g.us` | Disable a group. |
 | `/whatsapp:access set ackReaction 👀` | Set a config key: `ackReaction`, `replyToMode`, `textChunkLimit`, `chunkMode`, `mentionPatterns`. |
 
 ## Config file
@@ -111,11 +111,11 @@ Configure outbound behavior with `/whatsapp:access set <key> <value>`.
   "dmPolicy": "pairing",
 
   // WhatsApp JIDs allowed to DM.
-  "allowFrom": ["15551234567@s.whatsapp.net"],
+  "allowFrom": ["886912345678@s.whatsapp.net"],
 
   // Groups the channel is active in. Empty object = DM-only.
   "groups": {
-    "123456789012345678@g.us": {
+    "120363424405607157@g.us": {
       // true: respond only to @mentions.
       "requireMention": true,
       // Restrict triggers to these senders. Empty = any member (subject to requireMention).
