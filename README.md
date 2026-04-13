@@ -1,10 +1,15 @@
 # WhatsApp MCP Server for Claude Code: Run AI Directly from WhatsApp
 
+[![Anthropic Published](https://img.shields.io/badge/Anthropic-Official%20Published-ff6b35?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDIwaDQuNUwxMiA4bDMuNSAxMkgyMEwxMiAyeiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=)](https://claude.com/plugins)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-Plugin-blue)](https://claude.com/plugins)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-green)](https://modelcontextprotocol.io)
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub Stars](https://img.shields.io/github/stars/Rich627/whatsapp-claude-plugin?style=social)](https://github.com/Rich627/whatsapp-claude-plugin)
+
+> **Published on the [Anthropic Official Plugin Marketplace](https://claude.com/plugins)** — the first community-built WhatsApp channel plugin to be officially reviewed and published by Anthropic.
+
+![Anthropic Published Status](assets/published-screenshot.png)
 
 Connect WhatsApp as a native channel to your Claude Code session using this MCP server plugin. Automate tasks, execute code, search files, and interact with Claude AI directly from WhatsApp messaging—no bots, no API keys, just your personal WhatsApp account connected as a linked device. Built on Baileys for reliable WhatsApp Web connectivity.
 
