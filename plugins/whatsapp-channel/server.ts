@@ -418,7 +418,9 @@ function logOutbound(line: string): void {
 function moveToFailed(file: string, reason: string): void {
   try {
     mkdirSync(OUTBOUND_FAILED_DIR, { recursive: true, mode: 0o700 })
-    const dst = join(OUTBOUND_FAILED_DIR, basename(file))
+    // Strip .processing suffix so the failed copy keeps its original .json name.
+    const origName = basename(file).replace(/\.processing$/, '')
+    const dst = join(OUTBOUND_FAILED_DIR, origName)
     renameSync(file, dst)
     chmodSync(dst, 0o600)
     writeFileSync(dst.replace(/\.json$/, '_error.txt'), reason + '\n', { mode: 0o600 })
@@ -435,23 +437,35 @@ function checkOutbound(): void {
 
   for (const filename of jsons) {
     const file = join(OUTBOUND_DIR, filename)
+    const processingFile = file + '.processing'
+
+    // Claim this file atomically — if another concurrent scan (or a retry of
+    // the fs.watch event for the same file) already renamed it, this fails
+    // with ENOENT and we skip silently. Dedup at the filesystem level.
+    try {
+      renameSync(file, processingFile)
+    } catch {
+      continue
+    }
 
     let parsed: OutboundMsg
     try {
-      parsed = JSON.parse(readFileSync(file, 'utf8')) as OutboundMsg
+      parsed = JSON.parse(readFileSync(processingFile, 'utf8')) as OutboundMsg
     } catch (err) {
       logOutbound(`PARSE_FAIL ${filename}: ${err}`)
-      moveToFailed(file, `parse error: ${err}`)
+      moveToFailed(processingFile, `parse error: ${err}`)
       continue
     }
 
     if (!parsed || typeof parsed.chat_id !== 'string' || typeof parsed.text !== 'string' || !parsed.chat_id || !parsed.text) {
       logOutbound(`INVALID_SHAPE ${filename}: chat_id+text required (non-empty strings)`)
-      moveToFailed(file, 'invalid shape: chat_id and text required (non-empty strings)')
+      moveToFailed(processingFile, 'invalid shape: chat_id and text required (non-empty strings)')
       continue
     }
 
     if (!sock) {
+      // Socket not ready: restore the original name so the next tick retries.
+      try { renameSync(processingFile, file) } catch {}
       logOutbound(`NO_SOCK ${filename} — socket not connected, retry next tick`)
       continue
     }
@@ -461,11 +475,11 @@ function checkOutbound(): void {
     void sock.sendMessage(chatId, { text: parsed.text }).then(
       () => {
         logOutbound(`SENT ${filename} alert=${alertId} chat=${chatId}`)
-        rmSync(file, { force: true })
+        rmSync(processingFile, { force: true })
       },
       err => {
         logOutbound(`SEND_FAIL ${filename} alert=${alertId} chat=${chatId} err=${err}`)
-        moveToFailed(file, `send error: ${err}`)
+        moveToFailed(processingFile, `send error: ${err}`)
       },
     )
   }
