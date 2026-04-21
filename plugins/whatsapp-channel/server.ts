@@ -34,7 +34,7 @@ import { randomBytes } from 'crypto'
 import { execFileSync } from 'child_process'
 import {
   readFileSync, writeFileSync, appendFileSync, mkdirSync, readdirSync, rmSync,
-  statSync, renameSync, realpathSync, chmodSync, existsSync,
+  statSync, renameSync, realpathSync, chmodSync, existsSync, watch,
 } from 'fs'
 import { homedir } from 'os'
 import { join, extname, sep, basename } from 'path'
@@ -48,6 +48,9 @@ const ENV_FILE = join(STATE_DIR, '.env')
 const GROUPS_DIR = join(STATE_DIR, 'groups')
 const LID_MAP_FILE = join(STATE_DIR, 'lid-map.json')
 const MESSAGE_LOG = join(STATE_DIR, 'messages.jsonl')
+const OUTBOUND_DIR = join(STATE_DIR, 'outbound')
+const OUTBOUND_FAILED_DIR = join(OUTBOUND_DIR, 'failed')
+const OUTBOUND_LOG = join(STATE_DIR, 'outbound.log')
 
 // Load ~/.whatsapp-channel/.env into process.env. Real env wins.
 try {
@@ -393,6 +396,149 @@ function checkApprovals(): void {
 }
 
 if (!STATIC) setInterval(checkApprovals, 5000).unref()
+
+// ─── Outbound file-drop IPC ─────────────────────────────────────────
+// External scripts drop JSON files in ~/.whatsapp-channel/outbound/ and the
+// running plugin picks them up via fs.watch (event-driven, <1s latency) with
+// a 30s polling fallback in case the watcher dies or misses an event. Malformed
+// or failed messages go to outbound/failed/ alongside a _error.txt sibling.
+// The failed/ dir is swept every hour — entries older than 7 days are removed.
+
+interface OutboundMsg {
+  chat_id: string
+  text: string
+  alert_id?: string
+  created_at?: string
+}
+
+function logOutbound(line: string): void {
+  try { appendFileSync(OUTBOUND_LOG, `[${new Date().toISOString()}] ${line}\n`) } catch {}
+}
+
+function moveToFailed(file: string, reason: string): void {
+  try {
+    mkdirSync(OUTBOUND_FAILED_DIR, { recursive: true, mode: 0o700 })
+    const dst = join(OUTBOUND_FAILED_DIR, basename(file))
+    renameSync(file, dst)
+    writeFileSync(dst.replace(/\.json$/, '_error.txt'), reason + '\n', { mode: 0o600 })
+  } catch (err) {
+    logOutbound(`MOVE_TO_FAILED_ERROR ${basename(file)}: ${err}`)
+  }
+}
+
+function checkOutbound(): void {
+  let files: string[]
+  try { files = readdirSync(OUTBOUND_DIR) } catch { return }
+  const jsons = files.filter(f => f.endsWith('.json'))
+  if (jsons.length === 0) return
+
+  for (const filename of jsons) {
+    const file = join(OUTBOUND_DIR, filename)
+
+    let parsed: OutboundMsg
+    try {
+      parsed = JSON.parse(readFileSync(file, 'utf8')) as OutboundMsg
+    } catch (err) {
+      logOutbound(`PARSE_FAIL ${filename}: ${err}`)
+      moveToFailed(file, `parse error: ${err}`)
+      continue
+    }
+
+    if (!parsed || typeof parsed.chat_id !== 'string' || typeof parsed.text !== 'string' || !parsed.chat_id || !parsed.text) {
+      logOutbound(`INVALID_SHAPE ${filename}: chat_id+text required (non-empty strings)`)
+      moveToFailed(file, 'invalid shape: chat_id and text required (non-empty strings)')
+      continue
+    }
+
+    if (!sock) {
+      logOutbound(`NO_SOCK ${filename} — socket not connected, retry next tick`)
+      continue
+    }
+
+    const alertId = parsed.alert_id || filename
+    const chatId = parsed.chat_id
+    void sock.sendMessage(chatId, { text: parsed.text }).then(
+      () => {
+        logOutbound(`SENT ${filename} alert=${alertId} chat=${chatId}`)
+        rmSync(file, { force: true })
+      },
+      err => {
+        logOutbound(`SEND_FAIL ${filename} alert=${alertId} chat=${chatId} err=${err}`)
+        moveToFailed(file, `send error: ${err}`)
+      },
+    )
+  }
+}
+
+// Debounce scans: fs.watch fires many events when a file is written byte-by-byte
+// (atomic renames fire 'rename', partial writes fire 'change'). Coalesce to one
+// scan per 500ms window so we never try to parse a half-written JSON.
+let outboundScanTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleOutboundScan(): void {
+  if (outboundScanTimer) return
+  outboundScanTimer = setTimeout(() => {
+    outboundScanTimer = null
+    checkOutbound()
+  }, 500)
+}
+
+function cleanupOldFailed(): void {
+  const now = Date.now()
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+  let files: string[]
+  try { files = readdirSync(OUTBOUND_FAILED_DIR) } catch { return }
+  let removed = 0
+  for (const f of files) {
+    const p = join(OUTBOUND_FAILED_DIR, f)
+    try {
+      const st = statSync(p)
+      if (now - st.mtimeMs > SEVEN_DAYS_MS) {
+        rmSync(p, { force: true })
+        removed++
+      }
+    } catch (err) {
+      logOutbound(`CLEANUP_STAT_FAIL ${f}: ${err}`)
+    }
+  }
+  if (removed > 0) logOutbound(`CLEANUP removed ${removed} files older than 7d from failed/`)
+}
+
+function startOutboundIPC(): void {
+  try { mkdirSync(OUTBOUND_DIR, { recursive: true, mode: 0o700 }) } catch {}
+  try { mkdirSync(OUTBOUND_FAILED_DIR, { recursive: true, mode: 0o700 }) } catch {}
+
+  // Event-driven: fs.watch on the outbound dir. Bun supports fs.watch on Linux
+  // via inotify (same API as Node). Listen to both 'rename' (file created/deleted)
+  // and 'change' (file contents modified).
+  let watcherOk = false
+  try {
+    const w = watch(OUTBOUND_DIR, { persistent: false }, (eventType) => {
+      if (eventType === 'rename' || eventType === 'change') scheduleOutboundScan()
+    })
+    w.on('error', err => {
+      logOutbound(`WATCH_ERROR ${err} — continuing with polling only`)
+      try { w.close() } catch {}
+    })
+    watcherOk = true
+    logOutbound(`WATCH_STARTED fs.watch on ${OUTBOUND_DIR}`)
+  } catch (err) {
+    logOutbound(`WATCH_UNAVAILABLE ${err} — polling only`)
+  }
+
+  // Polling fallback: 30s if the watcher is up, 10s if not. Also catches anything
+  // the watcher misses (rare but possible under heavy FS load).
+  const pollMs = watcherOk ? 30000 : 10000
+  setInterval(scheduleOutboundScan, pollMs).unref()
+
+  // Hourly cleanup of failed/ entries older than 7 days.
+  setInterval(cleanupOldFailed, 3600000).unref()
+
+  // Initial scan in case files were dropped before the watcher started.
+  scheduleOutboundScan()
+  logOutbound(`IPC_READY watcher=${watcherOk} poll_ms=${pollMs}`)
+}
+
+if (!STATIC) startOutboundIPC()
 
 // ─── Server-side cron engine ────────────────────────────────────────
 
