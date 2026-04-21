@@ -420,6 +420,7 @@ function moveToFailed(file: string, reason: string): void {
     mkdirSync(OUTBOUND_FAILED_DIR, { recursive: true, mode: 0o700 })
     const dst = join(OUTBOUND_FAILED_DIR, basename(file))
     renameSync(file, dst)
+    chmodSync(dst, 0o600)
     writeFileSync(dst.replace(/\.json$/, '_error.txt'), reason + '\n', { mode: 0o600 })
   } catch (err) {
     logOutbound(`MOVE_TO_FAILED_ERROR ${basename(file)}: ${err}`)
