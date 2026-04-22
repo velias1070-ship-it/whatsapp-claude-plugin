@@ -355,14 +355,19 @@ function gate(remoteJid: string, senderJid: string, text: string, mentionedJids:
   // Group
   const policy = access.groups[remoteJid]
   if (!policy) return { action: 'drop' }
+
+  // If sender isn't in allowFrom, don't deliver to the agent — but still log
+  // silently so the agent has context of what's happening in the group. Lets
+  // the owner ask "what did X say" without every employee needing to be
+  // whitelisted to invoke the agent.
   const groupAllowFrom = policy.allowFrom ?? []
-  if (groupAllowFrom.length > 0 && !isAllowedJid(senderJid, groupAllowFrom)) {
-    return { action: 'drop' }
+  const senderAllowed = groupAllowFrom.length === 0 || isAllowedJid(senderJid, groupAllowFrom)
+  if (!senderAllowed) {
+    return { action: 'log-only', access }
   }
+
   const requireMention = policy.requireMention ?? false
   if (requireMention && !isMentioned(text, mentionedJids, access.mentionPatterns)) {
-    // Sender is authorized for this group but didn't mention us — log silently
-    // so the agent can pull recent context when it IS mentioned.
     return { action: 'log-only', access }
   }
   return { action: 'deliver', access }
