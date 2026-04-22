@@ -49,6 +49,10 @@ const GROUPS_DIR = join(STATE_DIR, 'groups')
 const LID_MAP_FILE = join(STATE_DIR, 'lid-map.json')
 const MESSAGE_LOG = join(STATE_DIR, 'messages.jsonl')
 const OUTBOUND_DIR = join(STATE_DIR, 'outbound')
+// Silent log for group messages that don't trigger the agent (missing mention).
+// Lets the agent pull context on-demand when it IS mentioned, without the
+// token cost of processing every chatter message.
+const GROUP_HISTORY_DIR = join(STATE_DIR, 'group-history')
 const OUTBOUND_FAILED_DIR = join(OUTBOUND_DIR, 'failed')
 const OUTBOUND_LOG = join(STATE_DIR, 'outbound.log')
 
@@ -305,6 +309,9 @@ function pruneExpired(a: Access): boolean {
 type GateResult =
   | { action: 'deliver'; access: Access }
   | { action: 'drop' }
+  // Group message from an allowed sender but without mention — don't wake the
+  // agent, just log it so the agent can catch up on context when it IS mentioned.
+  | { action: 'log-only'; access: Access }
   | { action: 'pair'; code: string; isResend: boolean }
 
 function gate(remoteJid: string, senderJid: string, text: string, mentionedJids: string[]): GateResult {
@@ -354,7 +361,9 @@ function gate(remoteJid: string, senderJid: string, text: string, mentionedJids:
   }
   const requireMention = policy.requireMention ?? false
   if (requireMention && !isMentioned(text, mentionedJids, access.mentionPatterns)) {
-    return { action: 'drop' }
+    // Sender is authorized for this group but didn't mention us — log silently
+    // so the agent can pull recent context when it IS mentioned.
+    return { action: 'log-only', access }
   }
   return { action: 'deliver', access }
 }
@@ -413,6 +422,29 @@ interface OutboundMsg {
 
 function logOutbound(line: string): void {
   try { appendFileSync(OUTBOUND_LOG, `[${new Date().toISOString()}] ${line}\n`) } catch {}
+}
+
+// Silent log for group messages that didn't mention us. The agent can read
+// this file on-demand via Read/Bash when it needs context. One JSONL file per
+// group, truncated to last 500 lines periodically (done in cleanupOldFailed).
+function appendToGroupHistory(
+  chatId: string,
+  entry: { timestamp: number; senderJid: string; senderName: string; text: string; messageId: string },
+): void {
+  try {
+    mkdirSync(GROUP_HISTORY_DIR, { recursive: true, mode: 0o700 })
+    const file = join(GROUP_HISTORY_DIR, `${chatId}.jsonl`)
+    const line = JSON.stringify({
+      ts: new Date(entry.timestamp * 1000).toISOString(),
+      message_id: entry.messageId,
+      user_id: entry.senderJid,
+      user: entry.senderName,
+      text: entry.text,
+    }) + '\n'
+    appendFileSync(file, line, { mode: 0o600 })
+  } catch {
+    // Swallow silently — never break message flow because of a log write failure.
+  }
 }
 
 function moveToFailed(file: string, reason: string): void {
@@ -1502,6 +1534,13 @@ async function handleMessage(msg: WAMessage): Promise<void> {
   const result = gate(remoteJid, senderJid, text, mentionedJids)
 
   if (result.action === 'drop') return
+
+  // Group message from an allowed sender but no mention — silently log for
+  // later context reads and skip agent delivery.
+  if (result.action === 'log-only') {
+    appendToGroupHistory(remoteJid, { timestamp, senderJid, senderName, text, messageId })
+    return
+  }
 
   if (result.action === 'pair') {
     if (!sock) return
