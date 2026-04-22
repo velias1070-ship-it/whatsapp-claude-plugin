@@ -1540,10 +1540,14 @@ async function handleMessage(msg: WAMessage): Promise<void> {
 
   if (result.action === 'drop') return
 
-  // Group message from an allowed sender but no mention — silently log for
-  // later context reads and skip agent delivery.
+  // Group message — silently log for later context reads and skip agent
+  // delivery. `senderName` is derived here because the log-only branch runs
+  // before the main flow defines it further down.
   if (result.action === 'log-only') {
-    appendToGroupHistory(remoteJid, { timestamp, senderJid, senderName, text, messageId })
+    const senderNameForLog = msg.pushName ?? senderJid.split('@')[0]
+    appendToGroupHistory(remoteJid, {
+      timestamp, senderJid, senderName: senderNameForLog, text, messageId,
+    })
     return
   }
 
