@@ -1,0 +1,9 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Conductor — whatsapp-claude-plugin (plugin de Claude Code). Sin servidor propio.
+# Deps del canal: 'cd plugins/whatsapp-channel && bun install' (usa bun, no npm).
+
+[git]
+# Convención del workflow: rama corta -> PR a main -> merge -> borrar rama.
+archive_on_merge = true
+delete_branch_on_archive = true
